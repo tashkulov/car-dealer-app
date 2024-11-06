@@ -1,68 +1,100 @@
-"use client"
+'use client';
 
-import { useState, useEffect } from 'react';
-import {getVehicleMakes} from "../shared/api/vehicleApi.js";
-import Link from 'next/link.js';
+import { useEffect, useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import Link from 'next/link';
+import { fetchVehicleMakes } from '@/api/vehicles';
+import type { VehicleMake } from '@/types/api';
 
-type TModel = {
-    MakeId: string;
-    MakeName: string;
-};
+export default function Home() {
+    const [makes, setMakes] = useState<VehicleMake[]>([]);
+    const [selectedMake, setSelectedMake] = useState<string>('');
+    const [selectedYear, setSelectedYear] = useState<string>('');
+    const [loading, setLoading] = useState(true);
 
-function FilterPage() {
-  const [vehicleMakes, setVehicleMakes] = useState<TModel[]>([]);
-  const [selectedMake, setSelectedMake] = useState('');
-  const [selectedYear, setSelectedYear] = useState('');
-  const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: currentYear - 2014 }, (_, i) => 2015 + i);
+    // Generate years from 2015 to current year
+    const currentYear = new Date().getFullYear();
+    const years = Array.from(
+        { length: currentYear - 2015 + 1 },
+        (_, i) => (currentYear - i).toString()
+    );
 
-  useEffect(() => {
-    async function fetchVehicleMakes() {
-      const data = await getVehicleMakes();
-      setVehicleMakes(data);
-    }
-    fetchVehicleMakes();
-  }, []);
+    useEffect(() => {
+        const loadMakes = async () => {
+            try {
+                const response = await fetchVehicleMakes();
+                setMakes(response.Results);
+            } catch (error) {
+                console.error('Failed to fetch makes:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
+        loadMakes();
+    }, []);
 
-  return (
-      <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">Car Dealer Filter</h1>
-        <div className="flex space-x-4">
-          <select
-              className="border p-2 text-black"
-              value={selectedMake}
-              onChange={(e) => setSelectedMake(e.target.value)}
-          >
-            <option value="">Select Vehicle Make</option>
-            {vehicleMakes.map((make) => (
-                <option key={make.MakeId} value={make.MakeId}>
-                  {make.MakeName}
-                </option>
-            ))}
-          </select>
-          <select
-              className="border p-2 text-black"
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(e.target.value)}
-          >
-            <option value="">Select Year</option>
-            {years.map((year) => (
-                <option key={year} value={year}>
-                  {year}
-                </option>
-            ))}
-          </select>
-        </div>
-        <Link
-            href={`/result/${selectedMake}/${selectedYear}`}
-            className={`block mt-4 p-2 text-center bg-blue-500 text-white rounded ${!selectedMake || !selectedYear ? 'opacity-50' : ''}`}
-            style={{ pointerEvents: !selectedMake || !selectedYear ? 'none' : 'auto' }}
-        >
-          Next
-        </Link>
-      </div>
-  );
+    const isNextDisabled = !selectedMake || !selectedYear;
+
+    return (
+        <main className="min-h-screen p-8">
+            <div className="max-w-md mx-auto space-y-8">
+                <h1 className="text-3xl font-bold text-center">Car Dealer App</h1>
+
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Select Make</label>
+                        <Select
+                            disabled={loading}
+                            onValueChange={setSelectedMake}
+                            value={selectedMake}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a make" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {makes.map((make) => (
+                                    <SelectItem key={make.MakeId} value={make.MakeId.toString()}>
+                                        {make.MakeName}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium">Select Year</label>
+                        <Select
+                            onValueChange={setSelectedYear}
+                            value={selectedYear}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a year" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {years.map((year) => (
+                                    <SelectItem key={year} value={year}>
+                                        {year}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <Link
+                        href={isNextDisabled ? '#' : `/result/${selectedMake}/${selectedYear}`}
+                        className="w-full block"
+                    >
+                        <Button
+                            className="w-full"
+                            disabled={isNextDisabled}
+                        >
+                            Next
+                        </Button>
+                    </Link>
+                </div>
+            </div>
+        </main>
+    );
 }
-
-export default FilterPage;

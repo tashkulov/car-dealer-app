@@ -1,63 +1,72 @@
-"use client";
+// pages/result/[makeId]/[year].tsx
+import { Suspense } from 'react';
+import { fetchVehicleModels } from '@/api/vehicles';
+import { fetchVehicleMakes } from '@/api/vehicles'; // функция для получения всех доступных makeId
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
-import { useEffect, useState } from "react";
-import { use } from 'react';
+interface ResultPageProps {
+    params: {
+        makeId: string;
+        year: string;
+    };
+}
 
-type TParamsDate = {
-    year: string;
-    makeId: string;
-};
+export async function generateStaticParams() {
+    const makes = await fetchVehicleMakes();
+    const years = Array.from({ length: new Date().getFullYear() - 2015 + 1 }, (_, i) => 2015 + i);
 
-type TParams = {
-    params: TParamsDate
-};
-
-type TModel = {
-    Model_ID: string;
-    Model_Name: string;
-};
-
-const Page = ({ params }: TParams) => {
-    // @ts-ignore
-    const { makeId, year }: TParamsDate = use(params);
-
-    const [models, setModels] = useState<TModel[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        async function fetchVehicleModels() {
-            try {
-                const res = await fetch(
-                    `https://vpic.nhtsa.dot.gov/api/vehicles/GetModelsForMakeIdYear/makeId/${makeId}/modelyear/${year}?format=json`
-                );
-                const data = await res.json();
-                setModels(data.Results);
-                // eslint-disable-next-line no-unused-vars
-            } catch (error) {
-                setError('Failed to fetch vehicle models');
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchVehicleModels();
-    }, [makeId, year]);
-
-    if (loading) return <p>Загрузка...</p>;
-    if (error) return <p>{error}</p>;
-
-    return (
-        <div className="p-4">
-            <h1 className="text-xl font-bold">Модели для Make ID: {makeId}, Год: {year}</h1>
-            <ul>
-                {models.map((model) => (
-                    <li key={model.Model_ID} className="border p-2 mb-2">
-                        {model.Model_Name}
-                    </li>
-                ))}
-            </ul>
-        </div>
+    const paths = makes.Results.flatMap((make) =>
+        years.map((year) => ({
+            makeId: make.MakeId.toString(),
+            year: year.toString(),
+        }))
     );
-};
 
-export default Page;
+    return paths;
+}
+
+async function VehicleResults({ makeId, year }: { makeId: string; year: string }) {
+    try {
+        const models = await fetchVehicleModels(parseInt(makeId), parseInt(year));
+        if (!models.Results.length) {
+            return <div className="text-gray-600">No models found for this make and year.</div>;
+        }
+
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {models.Results.map((model) => (
+                    <div
+                        key={model.Model_ID}
+                        className="p-4 border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                    >
+                        <h3 className="font-semibold text-lg">{model.Model_Name}</h3>
+                        <p className="text-gray-600">{model.Make_Name}</p>
+                    </div>
+                ))}
+            </div>
+        );
+    } catch (error) {
+        console.error("Failed to fetch vehicle models:", error);
+        return <div className="text-red-500">Failed to load vehicle models. Please try again.</div>;
+    }
+}
+
+export default function ResultPage({ params }: ResultPageProps) {
+    return (
+        <main className="min-h-screen p-8">
+            <div className="max-w-7xl mx-auto">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold">Vehicle Models</h1>
+                    <Link href="/">
+                        <Button variant="outline">Back to Search</Button>
+                    </Link>
+                </div>
+
+                <Suspense fallback={<div>Loading vehicle models...</div>}>
+                    <VehicleResults makeId={params.makeId} year={params.year} />
+                </Suspense>
+            </div>
+        </main>
+    );
+}
